@@ -1,0 +1,78 @@
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "manticore.fullname" . }}
+  labels:
+    app: {{ template "manticore.name" . }}
+    release: {{ .Release.Name }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ template "manticore.name" . }}
+      release: {{ .Release.Name }}
+  {{- if .Values.persistence.enabled }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "manticore.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: [ "searchd", "--nodetach", "--config","/home/manticore.conf" ]    
+        env:
+          {{- range $key, $value := .Values.env }}
+          - name: {{ $key | quote }}
+            value: {{ $value | quote }}
+          {{- end }}
+        resources:
+{{ toYaml .Values.resources | indent 12 }}
+        ports:
+{{- range $port := .Values.service.ports }}
+          - name: {{ $port.name }}
+            containerPort: {{ $port.port }}
+            protocol: {{ $port.protocol }}
+{{- end }}
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - "mysqladmin ping"
+          initialDelaySeconds: 5
+          timeoutSeconds: 1
+        volumeMounts:
+        - name: manticore-configmap
+          mountPath: /home
+          readOnly: false
+        - name: data
+          mountPath: /var/lib/manticore/data
+          subPath: data
+          # {{- if .Values.persistence.subPath }}
+          # subPath: {{ .Values.persistence.subPath }}
+          # {{- end }}
+        - name: data
+          mountPath: /var/lib/manticore/replication
+          subPath: replication
+      volumes:
+        - name: manticore-configmap
+          configMap:
+            name: manticore-conf
+            items:
+            - key: manticore.conf
+              path: manticore.conf
+        - name: data
+        {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim  | default (include "manticore.fullname" .) }}
+        {{- else }}
+          emptyDir: {}
+        {{- end -}}

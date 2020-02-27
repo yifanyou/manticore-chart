@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: manticore-conf
+data:
+  manticore.conf: |-
+{{ .Values.manticore.config | indent 4 }}

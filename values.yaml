@@ -1,0 +1,124 @@
+replicaCount: 1
+
+nameOverride: 
+fullnameOverride: 
+
+image:
+  repository: manticoresearch/manticore
+  tag: 3
+  pullPolicy: IfNotPresent
+
+deployment:
+  managementPort: 9308
+
+service:
+  enabled: true
+  type: ClusterIP
+  ports:
+  - name: sphinxql
+    port: 9306
+    targetPort: 9306
+    protocol: TCP
+  - name: nativeapi
+    port: 9312
+    targetPort: 9312
+    protocol: TCP  
+  - name: httpapi
+    port: 9308
+    targetPort: 9308
+    protocol: TCP
+
+ingress:
+  enabled: true
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  path: /
+  host: manticore.phoenix-t.xforceplus.com
+  servicePort: 9308
+  tls: []
+
+## Persist data to a persistent volume
+persistence:
+  enabled: true
+  ## database data Persistent Volume Storage Class
+  ## If defined, storageClassName: <storageClass>
+  ## If set to "-", storageClassName: "", which disables dynamic provisioning
+  ## If undefined (the default) or set to null, no storageClassName spec is
+  ##   set, choosing the default provisioner.  (gp2 on AWS, standard on
+  ##   GKE, AWS & OpenStack)
+  ##
+  # storageClass: "-"
+  accessMode: ReadWriteOnce
+  size: 20Gi
+  annotations: {}
+
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 3Gi
+  requests:
+    cpu: 500m
+    memory: 2Gi
+
+manticore:
+  config: |-
+    #!/bin/sh
+    ip=`hostname -i`
+    cat << EOF
+    index testrt {
+        type = rt
+        rt_mem_limit = 128M
+        path = /var/lib/manticore/data/testrt
+        rt_field = title
+        rt_field = content
+        stored_fields = title,content
+        rt_attr_uint = gid
+        min_infix_len = 2
+    }
+    index pq {
+        type = percolate
+        path = /var/lib/manticore/data/pq
+        min_infix_len = 4
+    }
+    index oqsindex
+    {
+        type = rt
+        path = /var/lib/manticore/data/oqsindex
+        rt_attr_bigint = entity
+        rt_attr_bigint = pref
+        rt_attr_bigint = cref
+        rt_attr_json = jsonfields
+        rt_field = fullfields
+
+        rt_mem_limit = 1024m
+        enable_star = 1
+        min_infix_len = 3
+        infix_fields = stringfield
+    }    
+    searchd {
+        listen = 9306:mysql41
+        listen = /var/run/mysqld/mysqld.sock:mysql41
+        listen = $ip:9312
+        listen = 9308:http
+        
+        # more info about replication you can find at 
+        # https://docs.manticoresearch.com/latest/html/replication.html
+        listen = $ip:9315-9325:replication
+        log = /var/log/manticore/searchd.log
+        # you can also send query_log to /dev/stdout to be shown in docker logs
+        query_log = /var/log/manticore/query.log
+        read_timeout = 5
+        max_children = 30
+        pid_file = /var/run/manticore/searchd.pid
+        seamless_rotate = 1
+        preopen_indexes = 1
+        unlink_old = 1
+        workers = thread_pool
+        binlog_path = /var/lib/manticore/data
+        max_packet_size = 128M
+        mysql_version_string = 5.0.37
+        data_dir = /var/lib/manticore/replication
+    }
+    EOF
