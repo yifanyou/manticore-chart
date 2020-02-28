@@ -34,7 +34,7 @@ ingress:
     # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
   path: /
-  host: manticore.phoenix-t.xforceplus.com
+  host: xxxx.xxxx.com
   servicePort: 9308
   tls: []
 
