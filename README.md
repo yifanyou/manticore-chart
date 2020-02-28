@@ -1,6 +1,6 @@
-# manticoresearch chart
+#  manticore chart
 
-全文搜索引擎，官方地址：https://manticoresearch.com/
+manticoresearch 全文搜索引擎，官方地址：https://manticoresearch.com/
 
 ## 打包
 ```
